@@ -59,8 +59,8 @@ def onInitialize(processor):
     processor.addProperty("Is First Line Header", "Add True or False for whether first line is header." \
         "", True, False)
 
-    processor.addProperty("Input Schema", "If first line is not header, then Add Input Schema for \
-        incoming data", "", True, False)
+    processor.addProperty("Input Schema", "If first line is not header, then you must add Input Schema for \
+        incoming data. Else, you do not need to add an Input Schema.", "", False, False)
 
 def onSchedule(context):
     """ onSchedule is where you load and read properties
@@ -111,7 +111,7 @@ def onTrigger(context, session):
         test_h2o_frame = h2o.H2OFrame(read_cb.content)
         # does test dt frame column names (header) equal m_scorer feature_names (exp_header)
         first_line_header = context.getProperty("Is First Line Header")
-        if first_line_header == False:
+        if first_line_header == "False":
             test_h2o_frame.names = context.getProperty("Input Schema")
         # do scoring on test data in the test_h2o_frame, return dt frame with predicted label(s)
         preds_h2o_frame = mojo_model.predict(test_h2o_frame)
