@@ -1,6 +1,24 @@
 # H2O3-NiFi-MiNiFi-Integration
 Integrate H2O3 MOJO into NiFi &amp; MiNiFi C++
 
+Set your environment variables for EC2 instance pem key and public DNS. If on mac os x, set them in `~/.bash_profile` else if on linux, set them in `~/.profile`.
+
+- `H2O3_SCORING_PEM={pem-key}`
+- `H2O3_SCORING_INSTANCE={public-dns}`
+
+~~~bash
+ssh -i $H2O3_SCORING_PEM ubuntu@$H2O3_SCORING_INSTANCE
+~~~
+
+Clone GitHub Repo:
+
+~~~bash
+git clone https://github.com/james94/H2O3-NiFi-MiNiFi-Integration
+~~~
+
+The following commands were used to create directory structure, I include them in case you may want to recreate the directory
+structure in another project:
+
 ~~~bash
 # Create directory structure for H2O-3 model deployment projects
 
@@ -21,7 +39,6 @@ mkdir -p model-deployment/common/hydraulic/mojo-model
 # Create directory for NiFi and MiNiFi C++
 mkdir -p model-deployment/apps/{java,nifi/{nifi-nar-bundles,templates},nifi-minifi-cpp/{conf,minifi-python/h2o/h2o3/msp}}
 tree model-deployment
-
 ~~~
 
 Install H2O3 using Conda
@@ -30,11 +47,14 @@ Install H2O3 using Conda
 conda create -n h2o3-nifi-minifi python=3.6
 conda activate h2o3-nifi-minifi
 conda config --append channels conda-forge
-conda install -c -y h2oai h2o
-conda install 
+conda install -y -c h2oai h2o
+pip install datatable
+pip install pandas
+# Make all packages available on EC2 instance
+sudo apt-get -y update
+# Install Java to include open source H2O-3 algorithms
+sudo apt-get -y install openjdk-8-jdk
 ~~~
-
-
 
 Practice AutoML
 
@@ -157,7 +177,7 @@ best_model.save_mojo(path)
 
 Practice Productionizing H2O Models
 
-Predict on Real-Time Data
+Predict on Real-Time Data using H2O Frame
 
 ~~~python
 import os
@@ -182,6 +202,34 @@ if first_line_header == False:
 
 # test is an h2o frame, so instead of using datatable, I guess I will use h2o frame
 predictions = imported_model.predict(test_h2o_frame)
+~~~
+
+Predict on Real-Time Data using H2O Frame, but first convert from datatable to numpy to H2O Frame
+
+~~~python
+import os
+import h2o
+import datatable as dt
+h2o.init()
+
+path = os.path.join(os.environ['HOME'], "Development", "James", "H2O3-NiFi-MiNiFi-Integration", "model-deployment", "common", "hydraulic", "mojo-model", "GBM_grid__1_AutoML_20200511_075150_model_180.zip")
+
+imported_model = h2o.import_mojo(path)
+
+testData_path = os.path.join(os.environ['HOME'], "Development", "James", "H2O3-NiFi-MiNiFi-Integration", "model-deployment", "common", "hydraulic", "testData", "test-real-time-data", "test_0.csv")
+
+# Load csv data into Datatable
+test_dt_frame = dt.fread(testData_path)
+
+# convert datatable frame to h2oframe
+# load tabular data str of 1 or more rows into datatable frame
+test_h2o_frame = h2o.H2OFrame(python_obj=test_dt_frame.to_numpy(), column_names=list(test_dt_frame.names))
+
+predictions = imported_model.predict(test_h2o_frame)
+
+# Optional: Update the prediction names
+# cool_cond_y,cool_cond_y.3,cool_cond_y.20,cool_cond_y.100
+predictions.names = ['cool_cond_y','cool_cond_y.3','cool_cond_y.20','cool_cond_y.100']
 ~~~
 
 Predict on Batch Data
