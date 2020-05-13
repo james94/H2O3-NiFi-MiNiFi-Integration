@@ -29,8 +29,8 @@ Processors:
       Properties:
         Script File: /home/ubuntu/nifi-minifi-cpp-0.7.0/minifi-python/h2o/h2o3/mojo/ExecuteH2oMojoScoring.py
         MOJO Model Filepath: /home/ubuntu/H2O3-NiFi-MiNiFi-Integration/model-deployment/common/hydraulic/mojo-model/GBM_grid__1_AutoML_20200511_075150_model_180.zip
-        Is First Line Header: True
-        Input Schema: 
+        Use Output Header: True
+        Output Schema: cool_cond_y,cool_cond_y.3,cool_cond_y.20,cool_cond_y.100
 
     - name: ConvertDsToCsv
       class: ConvertDsToCsv
