@@ -22,7 +22,7 @@
     conda create -n h2o3-nifi-minifi python=3.6
     conda activate h2o3-nifi-minifi
     conda config --append channels conda-forge
-    conda install -c -y h2oai h2o
+    conda install -y -c h2oai h2o
 
     Option: Install H2O-3 with pip
 
