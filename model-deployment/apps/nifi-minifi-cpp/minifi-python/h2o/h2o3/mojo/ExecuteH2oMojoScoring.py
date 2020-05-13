@@ -38,7 +38,9 @@
 
 """
 import h2o
-h2o.init()
+import codecs
+import pandas as pd
+import datatable as dt
 
 mojo_model = None
 
@@ -52,22 +54,33 @@ def describe(processor):
 
 def onInitialize(processor):
     """ onInitialize is where you can set properties
+        processor.addProperty(name, description, defaultValue, required, el)
     """
     processor.addProperty("MOJO Model Filepath", "Add the filepath to the MOJO Model file. For example, \
         'path/to/mojo-model/GBM_grid__1_AutoML_20200511_075150_model_180.zip'.", "", True, False)
 
-    processor.addProperty("Is First Line Header", "Add True or False for whether first line is header." \
-        "", True, False)
+    processor.addProperty("Is First Line Header", "Add True or False for whether first line is header.", \
+        "True", True, False)
 
     processor.addProperty("Input Schema", "If first line is not header, then you must add Input Schema for \
-        incoming data. Else, you do not need to add an Input Schema.", "", False, False)
+        incoming data.If there is more than one column name, write a comma separated list of \
+        column names. Else, you do not need to add an Input Schema.", "", False, False)
+
+    processor.addProperty("Use Output Header", "Add True or False for whether you want to use an output \
+        for your predictions.", "False", False, False)
+
+    processor.addProperty("Output Schema", "To set Output Schema, 'Use Output Header' must be set to 'True' \
+        If you want more descriptive column names for your predictions, then add an Output Schema. If there \
+        is more than one column name, write a comma separated list of column names. Else, H2O-3 will include \
+        them by default", "", False, False)
 
 def onSchedule(context):
     """ onSchedule is where you load and read properties
         this function is called 1 time when the processor is scheduled to run
     """
-    # instantiate H2O-3's MOJO Model
     global mojo_model
+    h2o.init()
+    # instantiate H2O-3's MOJO Model
     mojo_model_filepath = context.getProperty("MOJO Model Filepath")
     mojo_model = h2o.import_mojo(mojo_model_filepath)
 
@@ -106,15 +119,21 @@ def onTrigger(context, session):
         read_cb = ContentExtract()
         session.read(flow_file, read_cb)
         # add flow file attribute for mojo model id
-        flow_file.addAttribute("mojo_model_id", mojo_model.model_id)
+        # flow_file.addAttribute("mojo_model_id", mojo_model.model_id)
         # load tabular data str of 1 or more rows into datatable frame
-        test_h2o_frame = h2o.H2OFrame(read_cb.content)
+        test_dt_frame = dt.Frame(read_cb.content)
+        test_h2o_frame = h2o.H2OFrame(python_obj=test_dt_frame.to_numpy(), column_names=list(test_dt_frame.names))
         # does test dt frame column names (header) equal m_scorer feature_names (exp_header)
         first_line_header = context.getProperty("Is First Line Header")
         if first_line_header == "False":
-            test_h2o_frame.names = context.getProperty("Input Schema")
+            input_schema = context.getProperty("Input Schema")
+            test_h2o_frame.names = list(input_schema.split(","))
         # do scoring on test data in the test_h2o_frame, return dt frame with predicted label(s)
         preds_h2o_frame = mojo_model.predict(test_h2o_frame)
+        use_output_header = context.getProperty("Use Output Header")
+        if use_output_header == "True":
+            output_schema = context.getProperty("Output Schema")
+            preds_h2o_frame.names = list(output_schema.split(","))
         # convert preds_h2o_frame to pandas dataframe, use_pandas=True by default
         preds_pd_df = h2o.as_list(preds_h2o_frame)
         # convert pandas df to str without df index, then write to flow file
